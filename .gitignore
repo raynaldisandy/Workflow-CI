@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 MLProject/mlruns/
 MLProject/mlflow.db
+MLProject/run_id.txt

@@ -27,6 +27,8 @@ jobs:
 
       - name: Run MLflow Project
         working-directory: ./MLProject
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
         run: |
           mlflow run . --env-manager=local -P n_estimators=200 -P max_depth=8
 
@@ -36,8 +38,35 @@ jobs:
           name: mlflow-model-artifacts
           path: |
             MLProject/mlruns/
+            MLProject/mlflow.db
+            MLProject/run_id.txt
             MLProject/*.png
             MLProject/*.txt
             MLProject/*.joblib
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image with MLflow
+        if: github.event_name != 'pull_request'
+        working-directory: ./MLProject
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+        run: |
+          RUN_ID=$(cat run_id.txt)
+          echo "MLflow Run ID: $RUN_ID"
+          mlflow models build-docker \
+            --model-uri "runs:/$RUN_ID/model" \
+            --name "raynaldi/telco-churn-mlflow:latest" \
+            --env-manager=local
+
+      - name: Push Docker image to Docker Hub
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push raynaldi/telco-churn-mlflow:latest
